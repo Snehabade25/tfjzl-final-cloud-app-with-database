@@ -1,1 +1,54 @@
 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ course.name }}</title>
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+    >
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand" href="{% url 'onlinecourse:index' %}">
+            OnlineCourse
+        </a>
+    </nav>
+
+    <main class="container mt-4">
+        <div class="jumbotron">
+            <h1 class="display-4">{{ course.name }}</h1>
+            <p class="lead">{{ course.description }}</p>
+        </div>
+
+        <h2 class="mb-3">Course Lessons</h2>
+
+        {% for lesson in course.lesson_set.all %}
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        Lesson {{ forloop.counter }}: {{ lesson.title }}
+                    </h5>
+                </div>
+
+                <div class="card-body">
+                    <p class="card-text">{{ lesson.content }}</p>
+                </div>
+            </div>
+        {% empty %}
+            <div class="alert alert-info">
+                No lessons are available for this course yet.
+            </div>
+        {% endfor %}
+
+        <a href="{% url 'onlinecourse:index' %}"
+           class="btn btn-secondary mt-2">
+            Back to Courses
+        </a>
+    </main>
+</body>
+</html>
