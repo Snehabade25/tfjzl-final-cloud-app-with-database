@@ -1,4 +1,5 @@
 
+
 import sys
 from django.utils.timezone import now
 
@@ -11,11 +12,10 @@ except Exception:
 from django.conf import settings
 
 
-# Instructor model
 class Instructor(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.CASCADE
     )
     full_time = models.BooleanField(default=True)
     total_learners = models.IntegerField()
@@ -24,11 +24,10 @@ class Instructor(models.Model):
         return self.user.username
 
 
-# Learner model
 class Learner(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.CASCADE
     )
 
     STUDENT = 'student'
@@ -40,7 +39,7 @@ class Learner(models.Model):
         (STUDENT, 'Student'),
         (DEVELOPER, 'Developer'),
         (DATA_SCIENTIST, 'Data Scientist'),
-        (DATABASE_ADMIN, 'Database Admin')
+        (DATABASE_ADMIN, 'Database Admin'),
     ]
 
     occupation = models.CharField(
@@ -54,7 +53,6 @@ class Learner(models.Model):
         return self.user.username + "," + self.occupation
 
 
-# Course model
 class Course(models.Model):
     name = models.CharField(
         max_length=30,
@@ -75,7 +73,6 @@ class Course(models.Model):
         return "Name: " + self.name + ",Description: " + self.description
 
 
-# Lesson model
 class Lesson(models.Model):
     title = models.CharField(max_length=200, default="title")
     order = models.IntegerField(default=0)
@@ -86,7 +83,6 @@ class Lesson(models.Model):
         return self.title
 
 
-# Enrollment model
 class Enrollment(models.Model):
     AUDIT = 'audit'
     HONOR = 'honor'
@@ -95,7 +91,7 @@ class Enrollment(models.Model):
     COURSE_MODES = [
         (AUDIT, 'Audit'),
         (HONOR, 'Honor'),
-        (BETA, 'BETA')
+        (BETA, 'BETA'),
     ]
 
     user = models.ForeignKey(
@@ -114,8 +110,10 @@ class Enrollment(models.Model):
     )
     rating = models.FloatField(default=5.0)
 
+    def __str__(self):
+        return f"{self.user.username} - {self.course.name}"
 
-# Question model
+
 class Question(models.Model):
     course = models.ForeignKey(
         Course,
@@ -128,22 +126,36 @@ class Question(models.Model):
     def __str__(self):
         return self.question_text
 
+    def is_get_score(self, selected_ids):
+        correct_ids = set(
+            self.choices.filter(is_correct=True)
+            .values_list('id', flat=True)
+        )
 
-# Choice model
+        selected_ids_for_question = set(
+            self.choices.filter(id__in=selected_ids)
+            .values_list('id', flat=True)
+        )
+
+        return (
+            bool(correct_ids)
+            and correct_ids == selected_ids_for_question
+        )
+
+
 class Choice(models.Model):
     question = models.ForeignKey(
         Question,
         on_delete=models.CASCADE,
         related_name='choices'
     )
-    choice_text = models.CharField(max_length=200)
+    choice_text = models.CharField(max_length=100)
     is_correct = models.BooleanField(default=False)
 
     def __str__(self):
         return self.choice_text
 
 
-# Submission model
 class Submission(models.Model):
     enrollment = models.ForeignKey(
         Enrollment,
@@ -153,4 +165,5 @@ class Submission(models.Model):
     timestamp = models.DateTimeField(default=now)
 
     def __str__(self):
-        return f"Submission {self.id}"
+        return f"Submission for enrollment {self.enrollment.id}"
+
