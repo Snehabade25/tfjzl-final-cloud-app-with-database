@@ -6,7 +6,6 @@ from django.views import generic
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
-from django.utils import timezone
 from django.db import transaction
 import logging
 
@@ -48,24 +47,23 @@ def registration_request(request):
 
         user = User.objects.create_user(
             username=username,
+            password=password,
             first_name=first_name,
-            last_name=last_name,
-            password=password
+            last_name=last_name
         )
         login(request, user)
-        return redirect("onlinecourse:index")
+        return redirect('onlinecourse:index')
 
-    return redirect("onlinecourse:index")
+    return redirect('onlinecourse:index')
 
 
 # User login
 def login_request(request):
     context = {}
 
-    if request.method == "POST":
+    if request.method == 'POST':
         username = request.POST['username']
         password = request.POST['psw']
-
         user = authenticate(username=username, password=password)
 
         if user is not None:
@@ -92,7 +90,7 @@ def logout_request(request):
     return redirect('onlinecourse:index')
 
 
-# Check enrollment
+# Check if a user is enrolled in a course
 def check_if_enrolled(user, course):
     if user.is_authenticated:
         return Enrollment.objects.filter(
@@ -109,8 +107,8 @@ class CourseListView(generic.ListView):
     context_object_name = 'course_list'
 
     def get_queryset(self):
-        user = self.request.user
         courses = Course.objects.order_by('-total_enrollment')[:10]
+        user = self.request.user
 
         for course in courses:
             course.is_enrolled = check_if_enrolled(user, course)
@@ -121,7 +119,7 @@ class CourseListView(generic.ListView):
 # Course details
 class CourseDetailView(generic.DetailView):
     model = Course
-    template_name = 'onlinecourse/course_detail_bootstrap.html'
+    template_name = 'onlinecourse/course_details_bootstrap.html'
 
 
 # Enroll in a course
@@ -130,9 +128,7 @@ def enroll(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
     user = request.user
 
-    is_enrolled = check_if_enrolled(user, course)
-
-    if not is_enrolled:
+    if not check_if_enrolled(user, course):
         Enrollment.objects.create(
             user=user,
             course=course,
@@ -142,22 +138,18 @@ def enroll(request, course_id):
         course.save()
 
     return HttpResponseRedirect(
-        reverse(
-            viewname='onlinecourse:course_details',
-            args=(course.id,)
-        )
+        reverse('onlinecourse:course_details', args=(course.id,))
     )
 
 
-# Collect selected answers from the exam form
+# Extract selected answer IDs from the submitted exam form
 def extract_answers(request):
     submitted_answers = []
 
     for key in request.POST:
         if key.startswith('choice'):
             try:
-                choice_id = int(request.POST[key])
-                submitted_answers.append(choice_id)
+                submitted_answers.append(int(request.POST[key]))
             except (TypeError, ValueError):
                 continue
 
@@ -173,7 +165,7 @@ def submit(request, course_id):
     if request.method != 'POST':
         return redirect(
             'onlinecourse:course_details',
-            course_id=course.id
+            pk=course.id
         )
 
     enrollment = get_object_or_404(
@@ -186,11 +178,11 @@ def submit(request, course_id):
         enrollment=enrollment
     )
 
-    answer_ids = extract_answers(request)
+    selected_ids = extract_answers(request)
 
-    # Only accept choices belonging to questions in this course.
+    # Save only choices that belong to this course.
     valid_choices = Choice.objects.filter(
-        id__in=answer_ids,
+        id__in=selected_ids,
         question__course=course
     ).distinct()
 
@@ -215,46 +207,36 @@ def show_exam_result(request, course_id, submission_id):
         enrollment__course=course
     )
 
-    selected_choices = submission.choices.all()
-
-    # Map each question to the selected choice, if any.
-    selected_by_question = {
-        choice.question_id: choice
-        for choice in selected_choices
-    }
+    selected_ids = list(
+        submission.choices.values_list('id', flat=True)
+    )
 
     questions = Question.objects.filter(
         course=course
     ).prefetch_related('choices')
 
-    results = []
+    question_results = []
     score = 0
     total_score = 0
 
     for question in questions:
-        choices = list(question.choices.all())
-        selected_choice = selected_by_question.get(question.id)
-
-        correct_choices = [
-            choice for choice in choices if choice.is_correct
-        ]
-
-        is_correct = (
-            selected_choice is not None
-            and selected_choice.is_correct
+        is_correct = question.is_get_score(selected_ids)
+        selected_choices = question.choices.filter(
+            id__in=selected_ids
         )
+        correct_choices = question.choices.filter(is_correct=True)
 
         if is_correct:
             score += question.grade
 
         total_score += question.grade
 
-        results.append({
+        question_results.append({
             'question': question,
-            'choices': choices,
-            'selected_choice': selected_choice,
+            'selected_choices': selected_choices,
             'correct_choices': correct_choices,
             'is_correct': is_correct,
+            'grade': question.grade,
         })
 
     passed = total_score > 0 and score >= total_score * 0.5
@@ -262,7 +244,7 @@ def show_exam_result(request, course_id, submission_id):
     context = {
         'course': course,
         'submission': submission,
-        'results': results,
+        'question_results': question_results,
         'score': score,
         'total_score': total_score,
         'passed': passed,
