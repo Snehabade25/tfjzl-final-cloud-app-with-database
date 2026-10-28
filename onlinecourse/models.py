@@ -1,15 +1,15 @@
 
-
 import sys
+
+from django.conf import settings
+from django.db import models
 from django.utils.timezone import now
 
 try:
     from django.db import models
 except Exception:
-    print("There was an error loading django modules. Do you have django installed?")
+    print("There was an error loading Django modules. Is Django installed?")
     sys.exit()
-
-from django.conf import settings
 
 
 class Instructor(models.Model):
@@ -25,11 +25,6 @@ class Instructor(models.Model):
 
 
 class Learner(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE
-    )
-
     STUDENT = 'student'
     DEVELOPER = 'developer'
     DATA_SCIENTIST = 'data_scientist'
@@ -42,6 +37,10 @@ class Learner(models.Model):
         (DATABASE_ADMIN, 'Database Admin'),
     ]
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
     occupation = models.CharField(
         max_length=20,
         choices=OCCUPATION_CHOICES,
@@ -50,14 +49,11 @@ class Learner(models.Model):
     social_link = models.URLField(max_length=200)
 
     def __str__(self):
-        return self.user.username + "," + self.occupation
+        return f"{self.user.username}, {self.occupation}"
 
 
 class Course(models.Model):
-    name = models.CharField(
-        max_length=30,
-        default='online course'
-    )
+    name = models.CharField(max_length=30, default='online course')
     image = models.ImageField(upload_to='course_images/')
     description = models.CharField(max_length=1000)
     pub_date = models.DateField(null=True)
@@ -70,7 +66,7 @@ class Course(models.Model):
     is_enrolled = False
 
     def __str__(self):
-        return "Name: " + self.name + ",Description: " + self.description
+        return f"Name: {self.name}, Description: {self.description}"
 
 
 class Lesson(models.Model):
@@ -98,10 +94,7 @@ class Enrollment(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE
     )
-    course = models.ForeignKey(
-        Course,
-        on_delete=models.CASCADE
-    )
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
     date_enrolled = models.DateField(default=now)
     mode = models.CharField(
         max_length=5,
@@ -128,18 +121,19 @@ class Question(models.Model):
 
     def is_get_score(self, selected_ids):
         correct_ids = set(
-            self.choices.filter(is_correct=True)
-            .values_list('id', flat=True)
+            self.choices.filter(
+                is_correct=True
+            ).values_list('id', flat=True)
         )
 
         selected_ids_for_question = set(
-            self.choices.filter(id__in=selected_ids)
-            .values_list('id', flat=True)
+            self.choices.filter(
+                id__in=selected_ids
+            ).values_list('id', flat=True)
         )
 
-        return (
-            bool(correct_ids)
-            and correct_ids == selected_ids_for_question
+        return bool(correct_ids) and (
+            correct_ids == selected_ids_for_question
         )
 
 
@@ -165,5 +159,7 @@ class Submission(models.Model):
     timestamp = models.DateTimeField(default=now)
 
     def __str__(self):
-        return f"Submission for enrollment {self.enrollment.id}"
-
+        return (
+            f"Submission {self.id} "
+            f"for enrollment {self.enrollment.id}"
+        )
